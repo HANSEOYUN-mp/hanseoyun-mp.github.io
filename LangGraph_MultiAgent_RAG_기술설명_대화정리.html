@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LangGraph 기반 멀티 에이전트 RAG 기술 설명 자료 (대화 정리)</title>
+  <style>
+    :root { --fg:#111; --muted:#666; --bg:#fff; --line:#e6e6e6; --code:#0b1020; --codefg:#e8e8e8; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+           color:var(--fg); background:var(--bg); margin:0; padding:0; line-height:1.65; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 34px 18px 80px; }
+    header { border-bottom: 1px solid var(--line); padding-bottom: 14px; margin-bottom: 20px; }
+    h1 { font-size: 26px; margin: 0 0 6px; }
+    .sub { color:var(--muted); margin: 0; font-size: 14px; }
+    h2 { margin-top: 26px; font-size: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+    ul { padding-left: 20px; }
+    li { margin: 6px 0; }
+    pre { background: var(--code); color: var(--codefg); padding: 14px; border-radius: 12px; overflow:auto; }
+    .callout { border: 1px solid var(--line); border-left: 4px solid #888; padding: 12px 14px; border-radius: 10px; background:#fafafa; }
+    .mini { color:var(--muted); font-size: 12.5px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>LangGraph 기반 멀티 에이전트 RAG 기술 설명 자료 (대화 정리)</h1>
+      <p class="sub">작성일: 2026-01-18 · 목적: LangGraph/멀티 에이전트/RAG 개념을 기술 설명 자료 형태로 정리</p>
+    </header>
+
+    <div class="callout">
+      <b>핵심 한 줄</b><br/>
+      LangGraph 기반 멀티 에이전트 RAG는 여러 역할의 노드(LLM/ML/규칙/툴)가 협업하며, 외부 지식을 Retrieval로 확보하고 그 근거를 사용해 Generation으로 답변을 생성하는 구조적 설계 방식이다.
+    </div>
+
+    
+    <section>
+      <h2>1. 목표와 배경</h2>
+      <ul><li>LLM(예: ChatGPT)은 문장을 잘 만들지만, 최신/사내/전문 문서처럼 &#x27;외부 지식&#x27;은 기본적으로 알지 못한다.</li>
+<li>RAG는 외부 지식을 검색(Retrieval)해 컨텍스트로 제공하고, LLM이 그 근거를 사용해 답변(Generation)하도록 하는 설계 패턴이다.</li>
+<li>LangGraph는 이런 과정을 &#x27;노드(작업 단위)와 엣지(흐름/분기)&#x27;로 모델링해, 멀티 에이전트 협업을 안정적으로 구현하게 해준다.</li></ul>
+    </section>
+    
+    <section>
+      <h2>2. 핵심 정의 (용어 고정)</h2>
+      <ul><li>RAG: Retrieval(외부 정보 확보) + Generation(LLM 답변 생성)의 결합 구조. 모델 종류가 아니라 &#x27;정보가 답변에 실제로 쓰이는 흐름&#x27;이 핵심.</li>
+<li>AI 에이전트: LLM 그 자체가 아니라, LLM/도구/API를 호출해 일을 수행·관리하는 &#x27;오케스트레이터(지휘자) 소프트웨어&#x27;.</li>
+<li>Retriever(검색 엔진): 벡터 DB/키워드 검색/SQL/웹 검색 등. &#x27;찾아오기&#x27; 계산을 담당하는 기능 모듈.</li>
+<li>Vector DB: 임베딩 벡터와 메타데이터를 저장하고 유사도 검색(top-k)을 제공하는 저장/검색 엔진.</li></ul>
+    </section>
+    
+    <section>
+      <h2>3. 멀티 에이전트 RAG에서의 역할 분리</h2>
+      <ul><li>Retrieval은 &#x27;역할(행위)&#x27;이고, 검색 에이전트는 그 Retrieval을 &#x27;언제/어떻게/얼마나&#x27; 수행할지 결정한다.</li>
+<li>대표 에이전트 예시: 질문 분석 → 검색(전략/쿼리) → 요약 → 검증 → 답변 생성</li>
+<li>모든 노드가 LLM일 필요는 없다. 일부 노드가 머신러닝/규칙 기반이어도, Retrieval 결과가 Generation에 쓰이면 RAG이다.</li></ul>
+    </section>
+    
+    <section>
+      <h2>4. 논문 검색 RAG: 2단 Retrieval(권장)</h2>
+      <ul><li>1차 Retrieval(코퍼스 수집): Google Scholar / IEEE Xplore / arXiv 등에서 논문 후보군과 메타데이터(연도, 저자, DOI 등) 수집.</li>
+<li>선별 단계(필수에 가까움): 후보군을 상위 N편으로 줄이고(연도/인용수/주제 적합도), 중복 제거.</li>
+<li>2차 Retrieval(정밀 탐색): 선별 논문을 chunking+embedding해 Vector DB를 구축하고, 질문과 가까운 chunk를 top-k로 검색.</li></ul>
+    </section>
+    
+    <section>
+      <h2>5. Chunking &amp; Embedding (왜/무엇/어떻게)</h2>
+      <ul><li>Chunking: 긴 문서를 검색 가능한 &#x27;의미 단위 조각(chunk)&#x27;으로 분할. 너무 크면 정밀도↓, 너무 작으면 맥락↓.</li>
+<li>Overlap(겹침): 경계에서 문맥이 끊기는 문제를 줄이기 위한 중첩 구간.</li>
+<li>Embedding: 텍스트 의미를 고차원 숫자 벡터로 변환(학습된 임베딩 모델이 수행). 의미 기반 검색의 핵심.</li>
+<li>Chunking은 대체로 파이썬 로직/라이브러리로, Embedding은 AI 회사 API 또는 로컬 임베딩 모델로 수행한다.</li></ul>
+    </section>
+    
+    <section>
+      <h2>6. “벡터 DB 생성 에이전트”의 정확한 역할</h2>
+      <ul><li>벡터 DB 생성 에이전트가 chunking/embedding을 &#x27;직접 계산&#x27;하는 게 아니라, 관련 API·라이브러리를 호출해 파이프라인을 수행·관리한다.</li>
+<li>주요 책임: (1) 어떤 문서를 처리할지 결정 (2) chunking 전략 선택 (3) 임베딩 모델 선택 (4) 저장/메타데이터 설계 (5) 실패 재시도/로깅</li></ul>
+    </section>
+    
+    <section>
+      <h2>7. 머신러닝 노드가 섞여도 RAG인가? (판정 기준)</h2>
+      <ul><li>YES 조건: Retrieval 결과(문서/청크/근거)가 최종 답변 생성에 실제로 사용되면 RAG.</li>
+<li>NO 조건: Retrieval과 무관하게 ML만 돌고 끝나거나, Generation과 연결되지 않으면 &#x27;ML 파이프라인&#x27;.</li></ul>
+    </section>
+    
+    <section>
+      <h2>8. 권장 아키텍처 예시 (텍스트 다이어그램)</h2>
+      <ul><li>예: 논문 기반 QA/요약 시스템</li></ul>
+    </section>
+    
+    <section>
+      <h2>9. 실무 체크리스트 (품질/비용/신뢰도)</h2>
+      <ul><li>전량 임베딩은 비용 폭발 위험 → 1차 수집 후 &#x27;선별 후 임베딩&#x27; 권장.</li>
+<li>메타데이터 필수(연도/저널/섹션/페이지/DOI) → 필터링·추적성 개선.</li>
+<li>검색 품질 개선: top-k + reranking(ML/LLM) + 섹션 우선순위(Method/Experiment 등).</li>
+<li>환각 억제: 답변에 인용(출처/논문명/페이지) 포함, 근거 없는 주장 제거(검증 에이전트).</li></ul>
+    </section>
+    
+
+    <section>
+      <h2>아키텍처 예시 다이어그램</h2>
+      <pre>[사용자 질문/주제+기간]
+        |
+        v
+(1) 질문 분석 에이전트
+        |
+        v
+(2) 학술 검색 에이전트  ----&gt; (외부 학술 DB: Scholar/IEEE/arXiv)  [1차 Retrieval]
+        |
+        v
+(3) 선별/필터 노드(규칙/ML 가능)
+        |
+        v
+(4) 문서 처리 파이프라인
+    - PDF 수집/파싱
+    - Chunking(+Overlap)
+    - Embedding (모델/API)
+    - Vector DB upsert
+        |
+        v
+(5) 벡터 검색 에이전트  ----&gt; (Vector DB)  [2차 Retrieval]
+        |
+        v
+(6) 요약/검증/답변 에이전트 (LLM Generation)
+</pre>
+      <p class="mini">※ 다이어그램은 개념 예시이며, 실제 구현에서는 로깅/캐시/권한/오류처리(재시도) 등이 추가된다.</p>
+    </section>
+  </div>
+</body>
+</html>
